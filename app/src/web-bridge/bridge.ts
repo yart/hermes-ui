@@ -438,6 +438,8 @@ export function copyTextWithSelection(text: string): boolean {
     textarea.select()
 
     return document.execCommand('copy')
+  } catch {
+    return false
   } finally {
     textarea.remove()
   }

@@ -21,4 +21,16 @@ describe('copyTextWithSelection', () => {
 
     expect(copyTextWithSelection('fallback')).toBe(false)
   })
+
+  it('falls back cleanly when the selection-copy command throws', () => {
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: () => {
+        throw new Error('copy command unavailable')
+      }
+    })
+
+    expect(copyTextWithSelection('fallback')).toBe(false)
+    expect(document.querySelector('textarea[data-hermes-clipboard-fallback]')).toBeNull()
+  })
 })
