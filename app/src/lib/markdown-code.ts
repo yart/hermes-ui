@@ -316,6 +316,15 @@ export function isLikelyProseCodeBlock(language: string | undefined, code: strin
     return false
   }
 
+  // An explicit recognized language is author intent. Its contents may look
+  // like prose: `text` can contain a list of unit names and `diff` necessarily
+  // starts removed lines with `-`, which resembles Markdown bullets. Do not
+  // discard the requested code presentation; the heuristic below is only for
+  // unlabelled and unknown fences.
+  if (cleanLanguage && (NON_CODE_FENCE_LANGUAGES.has(cleanLanguage) || COMMON_CODE_LANGUAGES.has(cleanLanguage))) {
+    return false
+  }
+
   if (signals.bulletLines >= 1 && (signals.hasMarkdown || signals.proseLines >= 2)) {
     return true
   }

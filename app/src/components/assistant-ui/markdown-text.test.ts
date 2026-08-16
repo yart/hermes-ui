@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { preprocessMarkdown } from '@/lib/markdown-preprocess'
+import { tailBoundedRemend } from '@/lib/remend-tail'
 
 describe('preprocessMarkdown', () => {
   it('strips inline accidental triple-backtick starts', () => {
@@ -68,6 +69,37 @@ describe('preprocessMarkdown', () => {
 
     expect(output).toContain('```ts')
     expect(output).toContain('const value = 1;')
+  })
+
+  it('keeps a closed text fence whose lines do not look like source code', () => {
+    const input = [
+      '```text',
+      'memory_midnight_pass.service',
+      'memory_weekly_pass.service',
+      'memory_doctor.service',
+      'memory_session_backlog.service',
+      'memory_vault_bridge_capture.service',
+      'ops-monitor-memory-daily.service',
+      '```'
+    ].join('\n')
+
+    expect(preprocessMarkdown(input)).toBe(input)
+  })
+
+  it('keeps a named text fence while its closing fence is still streaming', () => {
+    const body = [
+      '```text',
+      'memory_midnight_pass.service',
+      'memory_weekly_pass.service',
+      'memory_doctor.service',
+      'memory_session_backlog.service',
+      'memory_vault_bridge_capture.service',
+      'ops-monitor-memory-daily.service'
+    ].join('\n')
+
+    expect(preprocessMarkdown(body)).toBe(body)
+    expect(preprocessMarkdown(`${body}\n\`\`\``)).toBe(`${body}\n\`\`\``)
+    expect(tailBoundedRemend(preprocessMarkdown(body)).startsWith('```text')).toBe(true)
   })
 
   it('keeps dangling real code fences during streaming', () => {

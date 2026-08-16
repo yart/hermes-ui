@@ -79,7 +79,7 @@ function scrubBacktickNoise(text: string): string {
     const info = match[3] || ''
     const body = match[4] || ''
 
-    if (!hasCloseFenceLine(body, marker) && sanitizeLanguageTag(info) && !isLikelyProseFence(info, body)) {
+    if (!hasCloseFenceLine(body, marker) && sanitizeLanguageTag(info)) {
       protectedRanges.push({ end: text.length, start })
 
       break
@@ -260,7 +260,7 @@ function normalizeFenceBlocks(text: string): string {
         continue
       }
 
-      if (isLikelyProseFence(infoRaw, body)) {
+      if (!language && isLikelyProseFence(infoRaw, body)) {
         pushProseFence(out, indent, infoRaw, bodyLines)
       } else if (isMathFence(language)) {
         // Streaming math fence — rewrite the language tag to "math".
@@ -277,13 +277,6 @@ function normalizeFenceBlocks(text: string): string {
       }
 
       break
-    }
-
-    if (isLikelyProseFence(infoRaw, body)) {
-      pushProseFence(out, indent, infoRaw, bodyLines)
-      index = closeIndex + 1
-
-      continue
     }
 
     if (isMathFence(language)) {
