@@ -278,6 +278,16 @@ function hermesDynamicProxy(): Plugin {
   }
 }
 
+// The dashboard injects a short-lived session token into index.html at request
+// time. Caching that HTML shell in the service worker would replay a token from
+// before a dashboard restart, so Workbox must only precache static assets.
+export const PWA_WORKBOX_OPTIONS = {
+  globPatterns: ['**/*.{js,css,html,woff,woff2,ttf,otf,eot,png,jpg,jpeg,svg,gif,webp,ico}'],
+  globIgnores: ['**/index.html'],
+  maximumFileSizeToCacheInBytes: 32 * 1024 * 1024,
+  navigateFallback: null
+}
+
 export default defineConfig({
   base: './',
   // Per-build id, read by the React Query persistence layer as a cache buster so
@@ -314,28 +324,7 @@ export default defineConfig({
           { src: 'hermes.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      workbox: {
-        // Precache the built app shell. Workbox rewrites the manifest with the
-        // content-hashed filenames Vite emits, so nothing is hardcoded here.
-        // The `**/*.js` glob matches every emitted chunk (entry + the async
-        // vendor chunks split out in build.rolldownOptions), so the whole app
-        // - including lazily-loaded routes - stays precached and offline-ready.
-        globPatterns: ['**/*.{js,css,html,woff,woff2,ttf,otf,eot,png,jpg,jpeg,svg,gif,webp,ico}'],
-        // Code splitting is enabled (build.rolldownOptions), so the bundle is
-        // now many smaller hashed chunks rather than one ~28 MB file; the
-        // per-file cap is no longer the binding constraint. Kept generous so
-        // even the largest split vendor chunk is always precached - a chunk
-        // over the cap would be silently skipped and break offline use.
-        maximumFileSizeToCacheInBytes: 32 * 1024 * 1024,
-        // Serve index.html for real navigations so deep hash routes and hard
-        // refreshes work offline...
-        navigateFallback: 'index.html',
-        // ...but NEVER hijack the gateway: /api (REST + the /api/ws upgrade),
-        // /auth, and /login must always hit the network, not the SW cache.
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/login/]
-        // No runtimeCaching: there are no rules that could match /api, so the
-        // SW never caches or intercepts backend traffic.
-      },
+      workbox: PWA_WORKBOX_OPTIONS,
       devOptions: {
         // Keep the SW off in dev so it can't shadow the Vite /api proxy or
         // serve stale assets while iterating.
