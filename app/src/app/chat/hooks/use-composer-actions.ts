@@ -358,7 +358,8 @@ export function useComposerActions({ activeSessionId, currentCwd, requestGateway
    */
   const attachLocalFile = useCallback(
     async (blob: Blob, name?: string) => {
-      const filename = name || (blob instanceof File ? blob.name : '') || `image${blobExtension(blob)}`
+      const suppliedName = name || (blob instanceof File ? blob.name : '')
+      const filename = suppliedName || `image${blobExtension(blob)}`
 
       let bytesDataUrl: string
 
@@ -375,6 +376,12 @@ export function useComposerActions({ activeSessionId, currentCwd, requestGateway
       }
 
       const isImage = (blob.type && blob.type.startsWith('image/')) || isImagePath(filename)
+      // Browser-local files are byte payloads, not stable filesystem references.
+      // Chromium names clipboard screenshots `image.png`, so using any filename
+      // as the composer key makes each new paste replace the preceding one.
+      // Keep the filename for display/upload but always give the local payload a
+      // distinct identity.
+      const id = attachmentId(isImage ? 'image' : 'file', `${filename}:${crypto.randomUUID()}`)
 
       // `path` is set to the filename so submit routes this through the upload
       // pipeline (a pathless attachment is skipped); the bytes ride on
@@ -382,7 +389,7 @@ export function useComposerActions({ activeSessionId, currentCwd, requestGateway
       attachToMain(
         isImage
           ? {
-              id: attachmentId('image', filename),
+              id,
               kind: 'image',
               label: filename,
               detail: filename,
@@ -391,7 +398,7 @@ export function useComposerActions({ activeSessionId, currentCwd, requestGateway
               bytesDataUrl
             }
           : {
-              id: attachmentId('file', filename),
+              id,
               kind: 'file',
               label: filename,
               detail: filename,

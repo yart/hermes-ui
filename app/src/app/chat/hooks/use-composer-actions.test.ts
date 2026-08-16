@@ -1,5 +1,9 @@
+import { cleanup, render, waitFor } from '@testing-library/react'
+import { createElement, useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { I18nProvider } from '@/i18n/context'
+import { $composerAttachments } from '@/store/composer'
 import { $connection } from '@/store/session'
 
 import {
@@ -7,7 +11,8 @@ import {
   type DroppedFile,
   extractDroppedFiles,
   HERMES_PATHS_MIME,
-  partitionDroppedFiles
+  partitionDroppedFiles,
+  useComposerActions
 } from './use-composer-actions'
 
 // A Finder/Explorer drop carries a native File handle; an in-app drag (project
@@ -17,6 +22,50 @@ import {
 // can't read, plus image bytes for vision).
 const osDrop = (path: string): DroppedFile => ({ file: new File(['x'], path.split('/').pop() || 'f'), path })
 const inAppRef = (path: string, extra: Partial<DroppedFile> = {}): DroppedFile => ({ path, ...extra })
+
+function ComposerActionsHarness({ onReady }: { onReady: (actions: ReturnType<typeof useComposerActions>) => void }) {
+  const actions = useComposerActions({
+    activeSessionId: 'session-a',
+    currentCwd: '',
+    requestGateway: vi.fn() as never
+  })
+
+  useEffect(() => {
+    onReady(actions)
+  }, [actions, onReady])
+
+  return null
+}
+
+describe('browser-local image attachments', () => {
+  afterEach(() => {
+    cleanup()
+    $composerAttachments.set([])
+  })
+
+  it('keeps clipboard Files with the same image.png name instead of replacing earlier screenshots', async () => {
+    let actions: ReturnType<typeof useComposerActions> | undefined
+
+    render(
+      createElement(
+        I18nProvider,
+        {
+          configClient: { getConfig: async () => ({}), saveConfig: async () => ({ ok: true }) },
+          children: createElement(ComposerActionsHarness, { onReady: next => (actions = next) })
+        }
+      )
+    )
+
+    await waitFor(() => expect(actions).toBeDefined())
+    await actions!.attachImageBlob(new File(['first'], 'image.png', { type: 'image/png' }))
+    await actions!.attachImageBlob(new File(['second'], 'image.png', { type: 'image/png' }))
+    await actions!.attachImageBlob(new File(['third'], 'image.png', { type: 'image/png' }))
+
+    await waitFor(() => expect($composerAttachments.get()).toHaveLength(3))
+    expect($composerAttachments.get().map(attachment => attachment.label)).toEqual(['image.png', 'image.png', 'image.png'])
+    expect(new Set($composerAttachments.get().map(attachment => attachment.id)).size).toBe(3)
+  })
+})
 
 describe('partitionDroppedFiles', () => {
   it('routes File-bearing OS drops to osDrops and path-only in-app drags to inAppRefs', () => {
