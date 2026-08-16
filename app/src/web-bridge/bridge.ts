@@ -421,6 +421,28 @@ function downloadBlob(blob: Blob, filename: string): void {
  */
 type WebBridge = Omit<Window['hermesDesktop'], 'terminal' | 'git' | 'zoom'>
 
+/**
+ * Chromium can resolve Clipboard API writes without updating the system
+ * clipboard in installed Wayland web apps. The user-gesture selection path is
+ * older, but is reliable there and remains scoped to the browser bridge.
+ */
+export function copyTextWithSelection(text: string): boolean {
+  const textarea = document.createElement('textarea')
+  textarea.dataset.hermesClipboardFallback = ''
+  textarea.value = text
+  textarea.setAttribute('aria-hidden', 'true')
+  textarea.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+  document.body.append(textarea)
+
+  try {
+    textarea.select()
+
+    return document.execCommand('copy')
+  } finally {
+    textarea.remove()
+  }
+}
+
 export function createWebBridge(): Window['hermesDesktop'] {
   const bridge: WebBridge = {
     getConnection: async profile => connection(profile),
@@ -569,6 +591,10 @@ export function createWebBridge(): Window['hermesDesktop'] {
     },
     selectPaths: async () => [],
     writeClipboard: async text => {
+      if (copyTextWithSelection(text)) {
+        return true
+      }
+
       try {
         await navigator.clipboard.writeText(text)
 
